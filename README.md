@@ -2,7 +2,7 @@
 
 这是一个装在你日常 Chrome 里的 AI 助手，可以替你把浏览器上的事做完。复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单，说清目标即可，它会自己点击、填写、翻页、开新标签。它直接跑在你正在用的 Chrome 里，已经登录的账号和打开的页面都能接着用。
 
-基于 [Ember Browser Agent](https://github.com/Wrenbjor/ember-browser) 二次开发。
+基于 [Ember Browser Agent](https://github.com/Wrenbjor/ember-browser) 二次开发。代码是纯 JavaScript，没有构建步骤：扩展负责点页面，`mcp-server/server.js` 把这些动作收成一组 `browser_*` 工具。二次开发改动很小，浏览器能力留在这里；你按自己的场景单独写一份 skill，说明先看什么、再点什么、做到哪一步算完成。
 
 ![侧边栏发布任务后模型自己拆解并操作页面](docs/sidebar.png)
 
@@ -148,6 +148,20 @@ claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-serve
 `browser_snapshot`（带 `e12` 这种 ref）· `browser_read_page` · `browser_click` · `browser_type` · `browser_press_key` · `browser_scroll` · `browser_navigate` · `browser_wait` · `browser_tabs` / `browser_select_tab` / `browser_new_tab` · `browser_get_url` · `browser_screenshot` …
 
 典型一步：`browser_snapshot` → 找到 ref → `browser_click { "ref": "e12" }` → 再 snapshot。
+
+---
+
+## 写成你自己的 skill
+
+抢票、比价、填复杂表单、总结长页面，各自写成一份 skill。skill 跟这个仓库分开，只描述你的流程；扩展和本机桥继续负责读页面、点击、填写。
+
+一份 skill 通常写三件事：
+
+- 什么时候用，例如「用户要在已登录的票务站下单」
+- 步骤：`browser_snapshot` 拿到 ref，再 `browser_click` / `browser_type`，需要时 `browser_wait`
+- 做到哪一步算完成，例如订单页出现确认信息
+
+换一个场景就换一份 skill，核心代码保持不动。
 
 ---
 
