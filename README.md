@@ -2,7 +2,7 @@
 
 chrom-browser-agent
 
-这是一个装在你日常 Chrome 里的 AI 助手，可以替你把浏览器上的事做完。复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单，说清目标即可，它会自己点击、填写、翻页、开新标签。它直接跑在你正在用的 Chrome 里，已经登录的账号和打开的页面都能接着用。
+这是一个装在你日常 Chrome 里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，可以配合你的agent使用。
 
 只需要填入模型 API，即可使用该助手。
 
@@ -55,8 +55,6 @@ VITE_LLM_MODEL=你的本地模型名
 
 ---
 
-
-
 ## 1. 加载扩展
 
 1. 打开 `chrome://extensions`
@@ -67,8 +65,6 @@ VITE_LLM_MODEL=你的本地模型名
 点图标会打开侧边栏。
 
 ---
-
-
 
 ## 2. 启动本机桥
 
@@ -83,8 +79,6 @@ npm start
 工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿，说明已连上。改 `.env` 后重启 `npm start`。改扩展代码后在 `chrome://extensions` 重新加载。
 
 ---
-
-
 
 ## 3. 用法 A：侧边栏发布任务
 
@@ -106,16 +100,12 @@ npm start
 
 ---
 
-
-
 ## 4. 用法 B：配合本地 / 外部 Agent（MCP）
 
 本地 Agent 当大脑，这个仓库只出手。
 
 - 只让 MCP 客户端启动 `mcp-server/server.js`（推荐给 Cursor / Claude Code）
 - 或只自己 `npm start`（给侧边栏用；此时不要再让另一个进程绑 8765）
-
-
 
 ### Cursor
 
@@ -140,8 +130,6 @@ npm start
 claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-server/server.js
 ```
 
-
-
 ### Gemini CLI / Claude Desktop
 
 ```json
@@ -158,8 +146,6 @@ claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-serve
 自定义端口：`.env` 里改 `EMBER_MCP_PORT`（或环境变量 `BROWSER_MCP_PORT`），扩展默认连 8765。
 
 ---
-
-
 
 ## 怎么工作的
 
@@ -188,8 +174,6 @@ MCP 客户端 ──stdio──► mcp-server/server.js
 
 ---
 
-
-
 ## 常见问题
 
 **角标没有绿色 MCP / 侧边栏是灰点**  
@@ -211,8 +195,6 @@ MCP 客户端 ──stdio──► mcp-server/server.js
 点红色 **终止**。
 
 ---
-
-
 
 ## 许可
 
