@@ -2,7 +2,7 @@
 
 browser-use
 
-这是一个装在你 Chrome 浏览器里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，可以配合你的agent使用。
+这是一个装在你 Chrome 浏览器里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，真正解放你的工作任务，也可以配合你的agent使用。
 
 安装改chrome 插件后， 只需要配置模型 API，即可使用该助手。
 
@@ -33,27 +33,9 @@ browser-use
 git clone <本仓库>
 cd browser-use
 npm install
-cp .env.example .env
 ```
 
-编辑 `.env`：
-
-```env
-VITE_LLM_BASE_URL=https://openrouter.ai/api/v1
-VITE_LLM_API_KEY=你的key
-VITE_LLM_MODEL=你的模型名
-EMBER_MCP_PORT=8765
-```
-
-`VITE_LLM_MODEL` 填任何会 tool calling、且你的接口能访问的模型。本地也可以，例如 Ollama：
-
-```env
-VITE_LLM_BASE_URL=http://127.0.0.1:11434/v1
-VITE_LLM_API_KEY=ollama
-VITE_LLM_MODEL=你的本地模型名
-```
-
-只用侧边栏时，模型不读 `.env`。在侧边栏齿轮里填写接口地址、API key 和模型名称，点确认后下一次任务就用新模型。`.env` 只给下面的 MCP 本机桥用。
+模型在侧边栏齿轮里配置：填写接口地址、API key 和模型名称，点确认后下一次任务就用新模型。填任何会 tool calling、且你的接口能访问的模型。本地也可以，例如 Ollama 的 `http://127.0.0.1:11434/v1`。
 
 ---
 
@@ -80,7 +62,7 @@ VITE_LLM_MODEL=你的本地模型名
 npm start
 ```
 
-默认端口 `8765`。扩展连上后，工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿。改 `.env` 后重启 `npm start`。改扩展代码后在 `chrome://extensions` 重新加载。
+默认端口 `8765`。扩展连上后，工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿。改扩展代码后在 `chrome://extensions` 重新加载。
 
 ---
 
@@ -155,8 +137,6 @@ claude mcp add browser-use -- node /绝对路径/browser-use/mcp-server/server.j
 }
 ```
 
-自定义端口：`.env` 里改 `EMBER_MCP_PORT`（或环境变量 `BROWSER_MCP_PORT`），扩展默认连 8765。
-
 ---
 
 
@@ -172,11 +152,10 @@ MCP 客户端 ──stdio──► mcp-server/server.js
 ```
 
 
-| 目录                     | 作用                             |
-| ---------------------- | ------------------------------ |
-| `extension/`           | Chrome 扩展：后台、内容脚本、侧边栏          |
-| `mcp-server/server.js` | 仅外部 Agent 用的本机桥 + MCP          |
-| `.env`                 | MCP 桥的模型地址、key、端口（已 gitignore） |
+| 目录                     | 作用                    |
+| ---------------------- | --------------------- |
+| `extension/`           | Chrome 扩展：后台、内容脚本、侧边栏 |
+| `mcp-server/server.js` | 仅外部 Agent 用的本机桥 + MCP |
 
 
 依赖装在仓库根目录，不要在子目录再 `npm install`。
