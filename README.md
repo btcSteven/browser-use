@@ -1,6 +1,6 @@
 # chrom-browser-agent
 
-在**你自己的 Chrome** 里让 AI 操作网页：点按钮、填表、翻页、开新标签。登录态就是你平时用的那套，不另开 Playwright，不另开无痕配置。
+这是一个装在你日常 Chrome 里的 AI 助手，可以替你把浏览器上的事做完。复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单，说清目标即可，它会自己点击、填写、翻页、开新标签。它直接跑在你正在用的 Chrome 里，已经登录的账号和打开的页面都能接着用。
 
 基于 [Ember Browser Agent](https://github.com/Wrenbjor/ember-browser) 二次开发。
 
