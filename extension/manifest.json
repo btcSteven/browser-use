@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Valet",
+  "name": "browser-use",
   "version": "0.1.0",
   "description": "Local browser agent: MCP bridge plus side-panel chat using the .env chat model.",
   "permissions": ["tabs", "activeTab", "scripting", "storage", "sidePanel", "alarms"],
@@ -9,7 +9,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Valet"
+    "default_title": "browser-use"
   },
   "side_panel": {
     "default_path": "sidepanel/panel.html"

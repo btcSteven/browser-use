@@ -1,10 +1,10 @@
 # 让 AI 控制你的浏览器做任何事情
 
-chrom-browser-agent
+browser-use
 
-这是一个装在你日常 Chrome 里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，可以配合你的agent使用。
+这是一个装在你 Chrome 浏览器里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，可以配合你的agent使用。
 
-只需要配置模型 API，即可使用该助手。
+安装改chrome 插件后， 只需要配置模型 API，即可使用该助手。
 
 基于 [Ember Browser Agent](https://github.com/Wrenbjor/ember-browser) 二次开发。代码是纯 JavaScript，没有构建步骤，二次开发改动很小。
 
@@ -31,7 +31,7 @@ chrom-browser-agent
 
 ```
 git clone <本仓库>
-cd chrom-browser-agent
+cd browser-use
 npm install
 cp .env.example .env
 ```
@@ -64,7 +64,7 @@ VITE_LLM_MODEL=你的本地模型名
 1. 打开 `chrome://extensions`
 2. 打开右上角 **开发者模式**
 3. **加载已解压的扩展程序** → 选仓库里的 `extension/`
-4. 把 **Valet** 钉到工具栏
+4. 把 **browser-use** 钉到工具栏
 
 点图标会打开侧边栏。只用侧边栏时，到这里就可以发布任务，不必 `npm start`。侧边栏小圆点是灰的也没关系，那只表示 MCP 没连上。
 
@@ -124,9 +124,9 @@ npm start
 ```json
 {
   "mcpServers": {
-    "valet": {
+    "browser-use": {
       "command": "node",
-      "args": ["/绝对路径/chrom-browser-agent/mcp-server/server.js"]
+      "args": ["/绝对路径/browser-use/mcp-server/server.js"]
     }
   }
 }
@@ -137,7 +137,7 @@ npm start
 ### Claude Code
 
 ```bash
-claude mcp add valet -- node /绝对路径/chrom-browser-agent/mcp-server/server.js
+claude mcp add browser-use -- node /绝对路径/browser-use/mcp-server/server.js
 ```
 
 
@@ -147,9 +147,9 @@ claude mcp add valet -- node /绝对路径/chrom-browser-agent/mcp-server/server
 ```json
 {
   "mcpServers": {
-    "valet": {
+    "browser-use": {
       "command": "node",
-      "args": ["/绝对路径/chrom-browser-agent/mcp-server/server.js"]
+      "args": ["/绝对路径/browser-use/mcp-server/server.js"]
     }
   }
 }

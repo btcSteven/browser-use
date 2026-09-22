@@ -1,5 +1,5 @@
 {
-  "name": "chrom-browser-agent",
+  "name": "browser-use",
   "private": true,
   "type": "module",
   "scripts": {

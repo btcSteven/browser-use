@@ -1,4 +1,4 @@
-// Valet side panel: chat uses the model saved in the sidebar.
+// browser-use side panel: chat uses the model saved in the sidebar.
 // (no Settings). The model uses tools itself — snapshot, click, type — no Jev.
 
 const LOCAL = 'http://127.0.0.1:8765';
@@ -748,9 +748,9 @@ async function chatTurn(signal) {
  content = ''; // the "content" was just the tool-call markup
  if (!inlineParserWarned) {
  inlineParserWarned = true;
- addBubble('error', 'Heads-up: your model emitted tool calls as text and the server did not parse them — Valet recovered them client-side. For reliability, set your server\'s tool-call parser to match this model (see console). This message shows once per session.');
+ addBubble('error', 'Heads-up: your model emitted tool calls as text and the server did not parse them — browser-use recovered them client-side. For reliability, set your server\'s tool-call parser to match this model (see console). This message shows once per session.');
  console.warn(
- '[Valet] Recovered tool calls from text. Your OpenAI server is not parsing this model\'s tool-call format.\n' +
+ '[browser-use] Recovered tool calls from text. Your OpenAI server is not parsing this model\'s tool-call format.\n' +
  'vLLM: start with --enable-auto-tool-choice and a --tool-call-parser matching the model:\n' +
  ' • Llama / Nemotron (Llama-based): llama3_json\n' +
  ' • Qwen: qwen3_coder (or hermes)\n' +
