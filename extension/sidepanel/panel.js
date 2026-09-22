@@ -938,7 +938,6 @@ async function chatTurn(signal) {
 function setStopIdle() {
  stopBtn.classList.remove('loading');
  stopBtn.disabled = false;
- stopBtn.textContent = '终止';
  stopBtn.removeAttribute('aria-busy');
 }
 
@@ -957,7 +956,6 @@ function setSendBusy() {
 function setStopLoading() {
  stopBtn.classList.add('loading');
  stopBtn.disabled = true;
- stopBtn.textContent = '终止中';
  stopBtn.setAttribute('aria-busy', 'true');
 }
 

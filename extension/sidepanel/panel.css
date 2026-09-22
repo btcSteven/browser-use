@@ -215,52 +215,76 @@ footer {
 }
 
 .composer {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  position: relative;
 }
 
 textarea {
-  flex: 1;
+  display: block;
+  width: 100%;
   resize: none;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text);
-  padding: 8px 10px;
+  padding: 10px 48px 10px 12px;
   font: inherit;
   outline: none;
 }
 textarea:focus { border-color: var(--accent); }
 
-.composer-actions { display: flex; flex-direction: column; gap: 4px; }
-
 .composer button {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
   cursor: pointer;
-  padding: 6px 10px;
-  font-size: 14px;
+  font-size: 13px;
 }
-.composer button:hover { border-color: var(--accent); }
-#send-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
-#stop-btn { background: #b42318; border-color: #b42318; color: #fff; }
+#send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+#send-btn svg { width: 16px; height: 16px; display: block; }
+#send-btn:hover { filter: brightness(1.08); }
+#send-btn.hidden { display: none; }
+#stop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #b42318;
+  color: #fff;
+}
+#stop-btn svg { width: 16px; height: 16px; display: block; }
+#stop-btn:hover { filter: brightness(1.08); }
+#stop-btn.hidden { display: none; }
 #stop-btn.loading {
   cursor: progress;
   opacity: 0.85;
 }
+#stop-btn.loading svg { visibility: hidden; }
 #stop-btn.loading::before {
   content: '';
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 6px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: #fff;
   border-radius: 50%;
-  vertical-align: -1px;
   animation: stop-spin 0.7s linear infinite;
 }
 @keyframes stop-spin { to { transform: rotate(360deg); } }
