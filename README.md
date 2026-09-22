@@ -4,28 +4,30 @@ chrom-browser-agent
 
 这是一个装在你日常 Chrome 里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，可以配合你的agent使用。
 
-只需要填入模型 API，即可使用该助手。
+只需要配置模型 API，即可使用该助手。
 
 基于 [Ember Browser Agent](https://github.com/Wrenbjor/ember-browser) 二次开发。代码是纯 JavaScript，没有构建步骤，二次开发改动很小。
 
-![侧边栏发布任务后模型自己拆解并操作页面](docs/sidebar.png)
+
 
 两种用法，共用同一套浏览器能力：
 
 
-| 用法                      | 谁来想                            | 谁来点                       |
-| ----------------------- | ------------------------------ | ------------------------- |
-| **侧边栏任务**               | `.env` 里的 Chat 模型              | 扩展在当前 Chrome 里执行          |
-| **MCP + 本地 / 外部 Agent** | Cursor、Claude Code、Gemini CLI… | 同上，Agent 调 `browser_`* 工具 |
+| 用法                      | 谁来想                            | 谁来点                       | 要不要 `npm start` |
+| ----------------------- | ------------------------------ | ------------------------- | --------------- |
+| **侧边栏任务**               | 侧边栏齿轮里填的模型                     | 扩展在当前 Chrome 里执行          | 不用              |
+| **MCP + 本地 / 外部 Agent** | Cursor、Claude Code、Gemini CLI… | 同上，Agent 调 `browser_`* 工具 | 要               |
 
 
 ---
 
+
+
 ## 你需要什么
 
-- Node.js 20+
 - Chrome（或兼容 Chromium 的浏览器）
 - 一个会 **tool calling** 的模型（侧边栏）或任意 MCP 客户端（Agent）
+- Node.js 20+：只有配合 Cursor、Claude Code 这类外部 Agent 时才要。只用侧边栏可以不装、不跑 `npm start`
 
 ```
 git clone <本仓库>
@@ -51,38 +53,42 @@ VITE_LLM_API_KEY=ollama
 VITE_LLM_MODEL=你的本地模型名
 ```
 
-侧边栏**只读这个** `.env`，不要去扩展 Options 页填模型。
+只用侧边栏时，模型不读 `.env`。在侧边栏齿轮里填写接口地址、API key 和模型名称，点确认后下一次任务就用新模型。`.env` 只给下面的 MCP 本机桥用。
 
 ---
+
+
 
 ## 1. 加载扩展
 
 1. 打开 `chrome://extensions`
 2. 打开右上角 **开发者模式**
 3. **加载已解压的扩展程序** → 选仓库里的 `extension/`
-4. 把 **Ember Browser Agent** 钉到工具栏
+4. 把 **Valet** 钉到工具栏
 
-点图标会打开侧边栏。
+点图标会打开侧边栏。只用侧边栏时，到这里就可以发布任务，不必 `npm start`。侧边栏小圆点是灰的也没关系，那只表示 MCP 没连上。
 
 ---
 
-## 2. 启动本机桥
 
-在仓库根目录：
+
+## 2. 启动本机桥（仅 MCP）
+
+要让 Cursor、Claude Code、Gemini CLI 操作这个 Chrome 时，再在仓库根目录启动：
 
 ```bash
 npm start
 ```
 
-默认端口 `8765`：扩展连上来，侧边栏走这里代理 `.env` 里的模型，MCP 客户端也走这一份进程。
-
-工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿，说明已连上。改 `.env` 后重启 `npm start`。改扩展代码后在 `chrome://extensions` 重新加载。
+默认端口 `8765`。扩展连上后，工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿。改 `.env` 后重启 `npm start`。改扩展代码后在 `chrome://extensions` 重新加载。
 
 ---
 
+
+
 ## 3. 用法 A：侧边栏发布任务
 
-这是任务 Agent，不是问答机器人。
+这是任务 Agent，不是问答机器人。不启动 `npm start` 也能用：模型请求发往齿轮里填的接口，点击和填写由扩展直接在当前 Chrome 里完成。
 
 1. 打开你要操作的网页，再开侧边栏
 2. 发布目标，例如：`订一张武汉到北京的机票`
@@ -100,12 +106,16 @@ npm start
 
 ---
 
+
+
 ## 4. 用法 B：配合本地 / 外部 Agent（MCP）
 
-本地 Agent 当大脑，这个仓库只出手。
+本地 Agent 当大脑，这个仓库只出手。这一步才需要本机桥。
 
 - 只让 MCP 客户端启动 `mcp-server/server.js`（推荐给 Cursor / Claude Code）
-- 或只自己 `npm start`（给侧边栏用；此时不要再让另一个进程绑 8765）
+- 或只自己 `npm start`（不要再让另一个进程绑 8765）
+
+
 
 ### Cursor
 
@@ -114,7 +124,7 @@ npm start
 ```json
 {
   "mcpServers": {
-    "ember-browser": {
+    "valet": {
       "command": "node",
       "args": ["/绝对路径/chrom-browser-agent/mcp-server/server.js"]
     }
@@ -127,15 +137,17 @@ npm start
 ### Claude Code
 
 ```bash
-claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-server/server.js
+claude mcp add valet -- node /绝对路径/chrom-browser-agent/mcp-server/server.js
 ```
+
+
 
 ### Gemini CLI / Claude Desktop
 
 ```json
 {
   "mcpServers": {
-    "ember-browser": {
+    "valet": {
       "command": "node",
       "args": ["/绝对路径/chrom-browser-agent/mcp-server/server.js"]
     }
@@ -147,43 +159,42 @@ claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-serve
 
 ---
 
+
+
 ## 怎么工作的
 
 ```
-侧边栏 ──HTTP──► npm start (8765 代理 .env 模型)
-                      │
+侧边栏 ──模型接口（齿轮里的地址）
+   └── chrome.runtime ──► 扩展 background.js ──► content.js ──► 当前 Chrome 标签
+
 MCP 客户端 ──stdio──► mcp-server/server.js
-                      │ WebSocket /extension
-                      ▼
-                 扩展 background.js
-                      │
-                 content.js（快照、点击、输入、光标）
-                      ▼
-                 你正在用的 Chrome 标签
+                         └── WebSocket ──► 扩展 background.js ──► content.js ──► 当前 Chrome 标签
 ```
 
 
-| 目录                     | 作用                       |
-| ---------------------- | ------------------------ |
-| `extension/`           | Chrome 扩展：后台、内容脚本、侧边栏    |
-| `mcp-server/server.js` | 本机桥 + Chat 代理 + MCP      |
-| `.env`                 | 模型地址、key、端口（已 gitignore） |
+| 目录                     | 作用                             |
+| ---------------------- | ------------------------------ |
+| `extension/`           | Chrome 扩展：后台、内容脚本、侧边栏          |
+| `mcp-server/server.js` | 仅外部 Agent 用的本机桥 + MCP          |
+| `.env`                 | MCP 桥的模型地址、key、端口（已 gitignore） |
 
 
 依赖装在仓库根目录，不要在子目录再 `npm install`。
 
 ---
 
+
+
 ## 常见问题
 
-**角标没有绿色 MCP / 侧边栏是灰点**  
+**只用侧边栏，小圆点是灰的**  
+正常。灰点表示没连 MCP。侧边栏任务不依赖 `npm start`。
+
+**要用外部 Agent，但角标没有绿色 MCP**  
 先 `npm start`，再重新加载扩展。确认没被别的进程占用 8765。
 
 **侧边栏报 403 / region**  
-是上游模型地区限制，换 `.env` 里的 `VITE_LLM_MODEL`，重启 `npm start`。
-
-**显示「请先 npm start」或「env 未配 key」**  
-根目录没有可读的 `.env`，或服务没起来。
+是上游模型地区限制。在侧边栏齿轮里换一个你能访问的模型，点确认。
 
 **改了扩展界面没变化**  
 `chrome://extensions` 里重新加载，关掉侧边栏再打开。
@@ -195,6 +206,8 @@ MCP 客户端 ──stdio──► mcp-server/server.js
 点红色 **终止**。
 
 ---
+
+
 
 ## 许可
 

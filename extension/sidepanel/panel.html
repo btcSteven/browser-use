@@ -3,21 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ember Browser Agent</title>
+  <title>Valet</title>
   <link rel="stylesheet" href="panel.css" />
 </head>
 <body>
   <header>
     <div class="brand">
       <span class="flame">◆</span>
-      <span>Ember</span>
+      <span>Valet</span>
       <span id="model-name" class="model"></span>
     </div>
     <div class="header-actions">
       <span id="bridge-dot" class="dot" title="MCP bridge status"></span>
-      <button id="clear-btn" title="New conversation">⟲</button>
+      <button id="config-btn" type="button" title="模型配置">⚙</button>
+      <button id="clear-btn" type="button" title="New conversation">⟲</button>
     </div>
   </header>
+
+  <section id="llm-config" class="llm-config hidden">
+    <label for="cfg-base">接口地址</label>
+    <input id="cfg-base" type="text" placeholder="https://openrouter.ai/api/v1" autocomplete="off" />
+    <label for="cfg-key">API key</label>
+    <input id="cfg-key" type="password" placeholder="只保存在这台浏览器" autocomplete="off" />
+    <label for="cfg-model">模型名称</label>
+    <input id="cfg-model" type="text" placeholder="会 tool calling 的模型" autocomplete="off" />
+    <div class="llm-config-actions">
+      <button id="cfg-save" type="button">确认</button>
+      <span id="cfg-status"></span>
+    </div>
+  </section>
 
   <main id="messages">
     <div class="empty-state" id="empty-state">

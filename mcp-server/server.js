@@ -72,7 +72,7 @@ function readBody(req) {
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-llm-base-url');
 }
 
 function json(res, status, data) {
@@ -85,31 +85,47 @@ function json(res, status, data) {
   res.end(body);
 }
 
-function chatUpstream() {
-  const base = (process.env.VITE_LLM_BASE_URL || process.env.TEXT_MODEL_URL || 'https://openrouter.ai/api/v1').replace(
-    /\/$/,
-    ''
-  );
-  const url = base.endsWith('/chat/completions') ? base : `${base}/chat/completions`;
-  const key = process.env.VITE_LLM_API_KEY || process.env.TEXT_MODEL_API_KEY || process.env.OPENROUTER_API_KEY || '';
-  const model = process.env.VITE_LLM_MODEL || process.env.TEXT_MODEL || 'qwen/qwen3.8-max-0902';
-  return { url, key, model };
+function envChat() {
+  const baseUrl = (process.env.VITE_LLM_BASE_URL || '').trim().replace(/\/$/, '');
+  const key = (process.env.VITE_LLM_API_KEY || '').trim();
+  const model = (process.env.VITE_LLM_MODEL || '').trim();
+  return { baseUrl, key, model };
 }
 
-async function proxyChat(payload) {
-  const up = chatUpstream();
-  if (!up.key) {
-    const err = new Error('缺少 VITE_LLM_API_KEY。写在仓库根目录 .env。');
+function chatCompletionsUrl(base) {
+  const trimmed = String(base || '').trim().replace(/\/$/, '');
+  if (!trimmed) return '';
+  return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+}
+
+async function proxyChat(payload, req) {
+  const env = envChat();
+  if (!env.key) {
+    const err = new Error('缺少 VITE_LLM_API_KEY。写在仓库根目录 .env，或在侧边栏填写。');
     err.status = 500;
     throw err;
   }
-  const res = await fetch(up.url, {
+  const headerBase = String(req.headers['x-llm-base-url'] || '').trim();
+  const base = env.baseUrl || headerBase;
+  const url = chatCompletionsUrl(base);
+  if (!url || !/^https?:\/\//i.test(url)) {
+    const err = new Error('缺少 VITE_LLM_BASE_URL。写在 .env，或在侧边栏填写。');
+    err.status = 500;
+    throw err;
+  }
+  const model = env.model || payload.model;
+  if (!model) {
+    const err = new Error('缺少 VITE_LLM_MODEL。写在 .env，或在侧边栏填写。');
+    err.status = 500;
+    throw err;
+  }
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${up.key}`,
+      Authorization: `Bearer ${env.key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ...payload, model: up.model }),
+    body: JSON.stringify({ ...payload, model }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -130,8 +146,19 @@ const httpServer = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/llm') {
-      const up = chatUpstream();
-      return json(res, 200, { ok: true, model: up.model, configured: Boolean(up.key) });
+      const env = envChat();
+      return json(res, 200, {
+        ok: true,
+        baseUrl: env.baseUrl,
+        model: env.model,
+        apiKey: env.key,
+        hasKey: Boolean(env.key),
+        fromEnv: {
+          baseUrl: Boolean(env.baseUrl),
+          apiKey: Boolean(env.key),
+          model: Boolean(env.model),
+        },
+      });
     }
     if (req.method === 'POST' && url.pathname === '/v1/chat/completions') {
       const raw = await readBody(req);
@@ -141,7 +168,7 @@ const httpServer = http.createServer(async (req, res) => {
       } catch {
         return json(res, 400, { error: '请求不是合法 JSON' });
       }
-      const data = await proxyChat(payload);
+      const data = await proxyChat(payload, req);
       return json(res, 200, data);
     }
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -184,7 +211,7 @@ httpServer.on('error', (e) => {
 httpServer.listen(PORT, '127.0.0.1', () => {
   log(`WS   ws://127.0.0.1:${PORT}/extension`);
   log(`HTTP POST http://127.0.0.1:${PORT}/command`);
-  log(`HTTP POST http://127.0.0.1:${PORT}/v1/chat/completions  (chat = ${chatUpstream().model})`);
+  log(`HTTP POST http://127.0.0.1:${PORT}/v1/chat/completions  (chat = ${envChat().model || 'sidebar'})`);
 });
 
 wss.on('connection', (ws) => {
@@ -236,7 +263,7 @@ setInterval(() => {
   }
 }, 20000).unref();
 
-const mcp = new McpServer({ name: 'ember-browser', version: '0.1.0' });
+const mcp = new McpServer({ name: 'valet', version: '0.1.0' });
 
 const text = (data) => ({
   content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 2) }],

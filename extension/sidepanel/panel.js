@@ -1,4 +1,4 @@
-// Ember Mode 2: side-panel chat talks to the .env LLM via http://127.0.0.1:8765/v1
+// Valet side panel: chat uses the model saved in the sidebar.
 // (no Settings). The model uses tools itself — snapshot, click, type — no Jev.
 
 const LOCAL = 'http://127.0.0.1:8765';
@@ -39,7 +39,7 @@ function pickModel(msgs) {
 }
 
 function anyModelConfigured() {
- return !!(settings.modelLarge || settings.modelSmall || settings.modelVision || settings.model);
+ return !!(settings.baseUrl && (settings.modelLarge || settings.modelSmall || settings.modelVision || settings.model));
 }
 let messages = []; // OpenAI-format conversation (system prompt injected at send time)
 let transcript = []; // what's rendered on screen: {kind, text}
@@ -322,8 +322,14 @@ function throwIfAborted(signal) {
 
 async function callLLM(body, signal) {
  const headers = { 'Content-Type': 'application/json' };
+ let url;
+ if (settings.useEnvKey) {
+ url = `${LOCAL}/v1/chat/completions`;
+ if (!settings.fromEnv?.baseUrl && settings.baseUrl) headers['x-llm-base-url'] = settings.baseUrl;
+ } else {
  if (settings.apiKey) headers.Authorization = `Bearer ${settings.apiKey}`;
- const url = `${settings.baseUrl.replace(/\/$/, '')}/chat/completions`;
+ url = `${settings.baseUrl.replace(/\/$/, '')}/chat/completions`;
+ }
 
  let lastErr;
  for (let attempt = 0; attempt < 2; attempt++) {
@@ -742,9 +748,9 @@ async function chatTurn(signal) {
  content = ''; // the "content" was just the tool-call markup
  if (!inlineParserWarned) {
  inlineParserWarned = true;
- addBubble('error', 'Heads-up: your model emitted tool calls as text and the server did not parse them — Ember recovered them client-side. For reliability, set your server\'s tool-call parser to match this model (see console). This message shows once per session.');
+ addBubble('error', 'Heads-up: your model emitted tool calls as text and the server did not parse them — Valet recovered them client-side. For reliability, set your server\'s tool-call parser to match this model (see console). This message shows once per session.');
  console.warn(
- '[Ember] Recovered tool calls from text. Your OpenAI server is not parsing this model\'s tool-call format.\n' +
+ '[Valet] Recovered tool calls from text. Your OpenAI server is not parsing this model\'s tool-call format.\n' +
  'vLLM: start with --enable-auto-tool-choice and a --tool-call-parser matching the model:\n' +
  ' • Llama / Nemotron (Llama-based): llama3_json\n' +
  ' • Qwen: qwen3_coder (or hermes)\n' +
@@ -966,7 +972,7 @@ async function send() {
  const text = inputEl.value.trim();
  if (!text) return;
  if (!anyModelConfigured()) {
- addBubble('error', '本机服务未就绪。请在仓库根目录执行 npm start，并确认 .env 里有 VITE_LLM_MODEL / VITE_LLM_API_KEY。');
+ addBubble('error', '还没有可用的模型。在 .env 或侧边栏齿轮里填写接口地址和模型名称。');
  return;
  }
  inputEl.value = '';
@@ -1023,6 +1029,14 @@ inputEl.addEventListener('keydown', (e) => {
  }
 });
 
+$('config-btn').addEventListener('click', async () => {
+ const panel = $('llm-config');
+ const opening = panel.classList.contains('hidden');
+ panel.classList.toggle('hidden');
+ if (opening) await loadSettings();
+});
+$('cfg-save').addEventListener('click', saveLlmConfig);
+
 $('clear-btn').addEventListener('click', () => {
  messages = [];
  transcript = [];
@@ -1037,24 +1051,64 @@ $('open-settings-link')?.addEventListener('click', (e) => {
  chrome.runtime.openOptionsPage();
 });
 
-async function loadSettings() {
- settings = { ...DEFAULTS, toolsEnabled: true };
+const LLM_CONFIG_DEFAULTS = { llmBaseUrl: '', llmApiKey: '', llmModel: '' };
+
+async function readLlmConfig() {
  try {
- const res = await fetch(`${LOCAL}/llm`);
- const data = await res.json();
- if (data.model) {
- settings.model = data.model;
- settings.modelLarge = data.model;
- }
- if (data.configured === false) {
- $('model-name').textContent = 'env 未配 key';
- return;
- }
+ return await chrome.storage.local.get(LLM_CONFIG_DEFAULTS);
  } catch {
- $('model-name').textContent = '请先 npm start';
+ return { ...LLM_CONFIG_DEFAULTS };
+ }
+}
+
+function formValues() {
+ return {
+ baseUrl: $('cfg-base').value.trim().replace(/\/$/, ''),
+ apiKey: $('cfg-key').value.trim(),
+ model: $('cfg-model').value.trim(),
+ };
+}
+
+function applyConfigForm() {
+ $('cfg-base').value = settings.baseUrl || '';
+ $('cfg-key').value = settings.apiKey || '';
+ $('cfg-model').value = settings.model || '';
+ const btn = $('cfg-save');
+ btn.textContent = '确认';
+ btn.disabled = false;
+}
+
+async function loadSettings() {
+ const stored = await readLlmConfig();
+ settings.baseUrl = stored.llmBaseUrl || '';
+ settings.apiKey = stored.llmApiKey || '';
+ settings.model = stored.llmModel || '';
+ settings.modelLarge = settings.model;
+ settings.useEnvKey = false;
+ settings.toolsEnabled = true;
+ $('model-name').textContent = settings.model || '未配置模型';
+ applyConfigForm();
+}
+
+async function saveLlmConfig() {
+ const cur = formValues();
+ try {
+ await chrome.storage.local.set({
+ llmBaseUrl: cur.baseUrl,
+ llmApiKey: cur.apiKey,
+ llmModel: cur.model,
+ });
+ } catch {
+ $('cfg-status').textContent = '无法保存';
  return;
  }
- $('model-name').textContent = primaryTextModel() || 'no model';
+ settings.baseUrl = cur.baseUrl;
+ settings.apiKey = cur.apiKey;
+ settings.model = cur.model;
+ settings.modelLarge = cur.model;
+ $('model-name').textContent = settings.model || '未配置模型';
+ $('cfg-status').textContent = '已切换到 ' + (settings.model || '新配置');
+ setTimeout(() => { $('cfg-status').textContent = ''; }, 2000);
 }
 
 async function refreshBridgeDot() {

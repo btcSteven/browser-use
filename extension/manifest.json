@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ember Browser Agent",
+  "name": "Valet",
   "version": "0.1.0",
   "description": "Local browser agent: MCP bridge plus side-panel chat using the .env chat model.",
   "permissions": ["tabs", "activeTab", "scripting", "storage", "sidePanel", "alarms"],
@@ -9,7 +9,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Ember Browser Agent"
+    "default_title": "Valet"
   },
   "side_panel": {
     "default_path": "sidepanel/panel.html"

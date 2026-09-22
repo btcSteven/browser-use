@@ -70,6 +70,47 @@ header button {
 }
 header button:hover { color: var(--text); }
 
+.llm-config {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px 12px;
+  flex-shrink: 0;
+}
+.llm-config label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 8px 0 4px;
+}
+.llm-config input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font: inherit;
+  outline: none;
+}
+.llm-config input:focus { border-color: var(--accent); }
+.llm-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+#cfg-save {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 6px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+#cfg-save:disabled { opacity: 0.5; cursor: default; }
+#cfg-status { font-size: 12px; color: var(--text-dim); }
+
 main {
   flex: 1;
   overflow-y: auto;
