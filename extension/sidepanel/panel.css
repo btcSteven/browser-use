@@ -50,25 +50,37 @@ header {
   white-space: nowrap;
 }
 
-.header-actions { display: flex; align-items: center; gap: 8px; }
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.header-buttons { display: flex; align-items: center; gap: 2px; }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #555;
+  flex-shrink: 0;
 }
 .dot.on { background: #5dba6f; }
 
 header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-dim);
-  font-size: 16px;
   cursor: pointer;
-  padding: 2px 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 1;
 }
-header button:hover { color: var(--text); }
+#config-btn { font-size: 20px; }
+header button svg { width: 22px; height: 22px; display: block; }
+header button:hover { color: var(--text); background: var(--surface-2); }
 
 .llm-config {
   border-bottom: 1px solid var(--border);

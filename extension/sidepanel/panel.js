@@ -972,7 +972,7 @@ async function send() {
  const text = inputEl.value.trim();
  if (!text) return;
  if (!anyModelConfigured()) {
- addBubble('error', '还没有可用的模型。在 .env 或侧边栏齿轮里填写接口地址和模型名称。');
+ addBubble('error', '还没有可用的模型。在侧边栏齿轮里填写接口地址和模型名称。');
  return;
  }
  inputEl.value = '';
@@ -1107,8 +1107,7 @@ async function saveLlmConfig() {
  settings.model = cur.model;
  settings.modelLarge = cur.model;
  $('model-name').textContent = settings.model || '未配置模型';
- $('cfg-status').textContent = '已切换到 ' + (settings.model || '新配置');
- setTimeout(() => { $('cfg-status').textContent = ''; }, 2000);
+ $('llm-config').classList.add('hidden');
 }
 
 async function refreshBridgeDot() {

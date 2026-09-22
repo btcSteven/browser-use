@@ -15,8 +15,15 @@
     </div>
     <div class="header-actions">
       <span id="bridge-dot" class="dot" title="MCP bridge status"></span>
-      <button id="config-btn" type="button" title="模型配置">⚙</button>
-      <button id="clear-btn" type="button" title="New conversation">⟲</button>
+      <div class="header-buttons">
+        <button id="config-btn" type="button" title="模型配置" aria-label="模型配置">⚙</button>
+        <button id="clear-btn" type="button" title="新对话" aria-label="新对话" style="padding-top: 3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 6.2A1.8 1.8 0 0 1 7.8 4.4h8.4A1.8 1.8 0 0 1 18 6.2v6.2a1.8 1.8 0 0 1-1.8 1.8H10l-4 3.2V6.2z"></path>
+            <path d="M12 7.6v3.6M10.2 9.4h3.6"></path>
+          </svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -36,8 +43,7 @@
   <main id="messages">
     <div class="empty-state" id="empty-state">
       <p><strong>在这里发布任务。</strong></p>
-      <p>模型自己拆解、看页、规划并操作，直到做完或页面卡住。不是一问一答。</p>
-      <p class="hint">先执行 <code>npm start</code>，绿点表示插件已连接。</p>
+      <p>模型自己拆解、看页、规划并操作，直到做完为止。</p>
     </div>
   </main>
 
