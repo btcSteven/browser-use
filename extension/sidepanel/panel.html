@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ember Browser Agent</title>
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="flame">◆</span>
+      <span>Ember</span>
+      <span id="model-name" class="model"></span>
+    </div>
+    <div class="header-actions">
+      <span id="bridge-dot" class="dot" title="MCP bridge status"></span>
+      <button id="clear-btn" title="New conversation">⟲</button>
+    </div>
+  </header>
+
+  <main id="messages">
+    <div class="empty-state" id="empty-state">
+      <p><strong>在这里发布任务。</strong></p>
+      <p>模型自己拆解、看页、规划并操作，直到做完或页面卡住。不是一问一答。</p>
+      <p class="hint">先执行 <code>npm start</code>，绿点表示插件已连接。</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="composer">
+      <textarea id="input" rows="2" placeholder="发布任务，例如：订一张武汉到北京的机票"></textarea>
+      <div class="composer-actions">
+        <button id="send-btn" title="发送">➤</button>
+        <button id="stop-btn" class="hidden" title="终止当前任务">终止</button>
+      </div>
+    </div>
+  </footer>
+
+  <script src="panel.js"></script>
+</body>
+</html>

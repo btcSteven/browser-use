@@ -1,0 +1,11 @@
+{
+  "name": "ember-browser-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local MCP bridge + env chat proxy — uses repo-root dependencies",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-strip-types server.js"
+  }
+}

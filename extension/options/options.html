@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ember Browser Agent — Settings</title>
+  <style>
+    :root {
+      --bg: #1a1714; --surface: #242019; --surface-2: #2e2921; --border: #3a342a;
+      --text: #ece5da; --text-dim: #9a9183; --accent: #e8743b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      display: flex; justify-content: center; padding: 40px 16px;
+    }
+    .card { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    h1 span { color: var(--accent); }
+    .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 24px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 28px 0 12px; }
+    label { display: block; font-size: 13px; margin-bottom: 4px; color: var(--text-dim); }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 8px 10px; font: inherit; outline: none; margin-bottom: 14px;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .row { display: flex; gap: 10px; align-items: center; }
+    .check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; cursor: pointer; }
+    .check input { accent-color: var(--accent); }
+    .check small { color: var(--text-dim); }
+    button {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 9px 18px; font: inherit; cursor: pointer;
+    }
+    button.secondary { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
+    button:hover { filter: brightness(1.1); }
+    #status { margin-left: 12px; font-size: 13px; }
+    #status.ok { color: #5dba6f; }
+    #status.err { color: #d76a6a; }
+    .presets { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .presets button { font-size: 12px; padding: 4px 10px; }
+    .note { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1><span>◆</span> Ember Browser Agent</h1>
+    <p class="sub">Settings for the side-panel assistant (Mode 2) and the MCP bridge (Mode 1).</p>
+
+    <h2>Local LLM (chat mode)</h2>
+    <div class="presets">
+      <button type="button" class="preset secondary" data-url="http://localhost:11434/v1">Ollama</button>
+      <button type="button" class="preset secondary" data-url="http://localhost:1234/v1">LM Studio</button>
+      <button type="button" class="preset secondary" data-url="http://localhost:8000/v1">vLLM</button>
+      <button type="button" class="preset secondary" data-url="http://localhost:8080/v1">llama.cpp</button>
+    </div>
+
+    <label for="baseUrl">Base URL (OpenAI-compatible)</label>
+    <input id="baseUrl" type="text" placeholder="http://localhost:11434/v1" />
+
+    <label for="apiKey">API key (optional for most local servers)</label>
+    <input id="apiKey" type="password" autocomplete="off" />
+
+    <datalist id="model-list"></datalist>
+
+    <label for="modelLarge">Large model — primary reasoning &amp; tool calling</label>
+    <input id="modelLarge" type="text" list="model-list" />
+
+    <label for="modelSmall">Small model — optional, faster for simple turns</label>
+    <input id="modelSmall" type="text" list="model-list" />
+
+    <label for="modelVision">Vision model — image requests route here automatically</label>
+    <input id="modelVision" type="text" list="model-list" />
+
+    <label for="primaryModel">Primary text model (drives the chat)</label>
+    <select id="primaryModel">
+      <option value="large">Large model</option>
+      <option value="small">Small model</option>
+    </select>
+
+    <label class="check"><input id="toolsEnabled" type="checkbox" /> Enable tool calling — model can click, type, navigate (needs a tool-capable model)</label>
+    <label class="check"><input id="visionEnabled" type="checkbox" /> Enable vision — send screenshots; routed to the vision model above</label>
+    <label class="check"><input id="flushOnNavigate" type="checkbox" /> Auto-flush stale page data — compacts old tool calls after navigation</label>
+
+    <label for="maxToolSteps">Max tool steps per message</label>
+    <input id="maxToolSteps" type="number" min="0" />
+    <p class="note">How many actions the model may take before being forced to answer. 0 = unlimited. A repeated-identical-call detector still stops genuine loops.</p>
+
+    <label for="contextTokens">Model context window (tokens)</label>
+    <input id="contextTokens" type="number" min="2048" />
+    <p class="note">Used for sliding-window trimming. Match your server's configured context length.</p>
+
+    <h2>MCP bridge (Mode 1)</h2>
+    <label for="mcpPort">Bridge WebSocket port</label>
+    <input id="mcpPort" type="number" />
+    <p class="note">Must match the port the local mcp-server runs on (default 8765). Change requires restarting both.</p>
+
+    <div class="row">
+      <button type="button" id="save">Save</button>
+      <button type="button" id="test" class="secondary">Test connection</button>
+      <span id="status"></span>
+    </div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
