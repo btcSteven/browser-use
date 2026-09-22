@@ -10,12 +10,12 @@
 
 两种用法，共用同一套浏览器能力：
 
-| 用法 | 谁来想 | 谁来点 |
-|------|--------|--------|
-| **侧边栏任务** | `.env` 里的 Chat 模型 | 扩展在当前 Chrome 里执行 |
-| **MCP + 本地 / 外部 Agent** | Cursor、Claude Code、Gemini CLI… | 同上，Agent 调 `browser_*` 工具 |
 
-密钥只放仓库根目录 `.env`，不会打进扩展包。
+| 用法                      | 谁来想                            | 谁来点                       |
+| ----------------------- | ------------------------------ | ------------------------- |
+| **侧边栏任务**               | `.env` 里的 Chat 模型              | 扩展在当前 Chrome 里执行          |
+| **MCP + 本地 / 外部 Agent** | Cursor、Claude Code、Gemini CLI… | 同上，Agent 调 `browser_`* 工具 |
+
 
 ---
 
@@ -49,9 +49,11 @@ VITE_LLM_API_KEY=ollama
 VITE_LLM_MODEL=你的本地模型名
 ```
 
-侧边栏**只读这个 `.env`**，不要去扩展 Options 页填模型。
+侧边栏**只读这个** `.env`，不要去扩展 Options 页填模型。
 
 ---
+
+
 
 ## 1. 加载扩展
 
@@ -63,6 +65,8 @@ VITE_LLM_MODEL=你的本地模型名
 点图标会打开侧边栏。
 
 ---
+
+
 
 ## 2. 启动本机桥
 
@@ -77,6 +81,8 @@ npm start
 工具栏角标出现绿色 **MCP**，侧边栏小圆点变绿，说明已连上。改 `.env` 后重启 `npm start`。改扩展代码后在 `chrome://extensions` 重新加载。
 
 ---
+
+
 
 ## 3. 用法 A：侧边栏发布任务
 
@@ -98,14 +104,16 @@ npm start
 
 ---
 
+
+
 ## 4. 用法 B：配合本地 / 外部 Agent（MCP）
 
 本地 Agent 当大脑，这个仓库只出手。
 
-**不要同时**自己 `npm start` 又让 Agent 再拉起一份 `server.js`，端口会冲突。二选一：
-
 - 只让 MCP 客户端启动 `mcp-server/server.js`（推荐给 Cursor / Claude Code）
 - 或只自己 `npm start`（给侧边栏用；此时不要再让另一个进程绑 8765）
+
+
 
 ### Cursor
 
@@ -130,6 +138,8 @@ npm start
 claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-server/server.js
 ```
 
+
+
 ### Gemini CLI / Claude Desktop
 
 ```json
@@ -145,13 +155,9 @@ claude mcp add ember-browser -- node /绝对路径/chrom-browser-agent/mcp-serve
 
 自定义端口：`.env` 里改 `EMBER_MCP_PORT`（或环境变量 `BROWSER_MCP_PORT`），扩展默认连 8765。
 
-### Agent 能调的工具
-
-`browser_snapshot`（带 `e12` 这种 ref）· `browser_read_page` · `browser_click` · `browser_type` · `browser_press_key` · `browser_scroll` · `browser_navigate` · `browser_wait` · `browser_tabs` / `browser_select_tab` / `browser_new_tab` · `browser_get_url` · `browser_screenshot` …
-
-典型一步：`browser_snapshot` → 找到 ref → `browser_click { "ref": "e12" }` → 再 snapshot。
-
 ---
+
+
 
 ## 怎么工作的
 
@@ -168,15 +174,19 @@ MCP 客户端 ──stdio──► mcp-server/server.js
                  你正在用的 Chrome 标签
 ```
 
-| 目录 | 作用 |
-|------|------|
-| `extension/` | Chrome 扩展：后台、内容脚本、侧边栏 |
-| `mcp-server/server.js` | 本机桥 + Chat 代理 + MCP |
-| `.env` | 模型地址、key、端口（已 gitignore） |
+
+| 目录                     | 作用                       |
+| ---------------------- | ------------------------ |
+| `extension/`           | Chrome 扩展：后台、内容脚本、侧边栏    |
+| `mcp-server/server.js` | 本机桥 + Chat 代理 + MCP      |
+| `.env`                 | 模型地址、key、端口（已 gitignore） |
+
 
 依赖装在仓库根目录，不要在子目录再 `npm install`。
 
 ---
+
+
 
 ## 常见问题
 
@@ -199,6 +209,8 @@ MCP 客户端 ──stdio──► mcp-server/server.js
 点红色 **终止**。
 
 ---
+
+
 
 ## 许可
 

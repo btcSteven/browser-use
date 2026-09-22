@@ -171,6 +171,19 @@ const TOOLS = [
  },
  command: 'wait',
  },
+ {
+ name: 'finish',
+ description:
+ 'Stop and reply to the user. Call this as soon as the goal is done (you already have the data or the outcome is on the page) or you cannot continue. Do not call any other tool after this.',
+ parameters: {
+ type: 'object',
+ properties: {
+ status: { type: 'string', enum: ['done', 'blocked'], description: 'done = goal complete; blocked = cannot continue' },
+ message: { type: 'string', description: 'What to tell the user: the result, or why you stopped' },
+ },
+ required: ['status', 'message'],
+ },
+ },
 ];
 
 function toolDefs() {
@@ -277,7 +290,7 @@ async function buildSystemPrompt() {
  /* no active tab info available */
  }
  const toolNote = settings.toolsEnabled
- ? 'You have tools: page_snapshot, read_page, click, type_text, press_key, scroll, navigate, wait. ' +
+ ? 'You have tools: page_snapshot, read_page, click, type_text, press_key, scroll, navigate, wait, finish. ' +
  'Use page_snapshot to get refs (e1, e12…) before click/type. Click by ref, not x/y, unless the control is missing from the snapshot. ' +
  'After any click, type, or navigation, take a fresh page_snapshot — old refs are stale. ' +
  'Dropdowns: click to open, new snapshot, click the option. Forms: fill each field, pick matching options, then apply/submit. ' +
@@ -288,9 +301,11 @@ async function buildSystemPrompt() {
  return (
  'You are an autonomous browser task agent (like a work buddy), not a Q&A chatbot. ' +
  'The user publishes one goal in the side panel. You break it into steps, look at the page, plan, and operate until the goal is done or you are truly blocked. ' +
- 'Done = the requested outcome is visible on the page. Blocked = the control is missing, the page errored, or a captcha/login wall stops you — then stop and say what blocked you. ' +
- 'Do not stop halfway. Do not ask the user to confirm dates, options, or next steps if you can use the goal text or a value already on the page. ' +
- 'Do not end with “please wait” or a numbered list. If you stop, say what happened in one short paragraph — never leave a hanging “1.”. ' +
+ 'Done = the requested outcome is on the page, or the data the user asked for is already in a tool result. ' +
+ 'Blocked = the control is missing, the page errored, or a captcha/login wall stops you. ' +
+ 'As soon as you are done or blocked, call finish with a short message for the user. Include the data when you have it. finish ends the task — do not snapshot, click, type, or wait again. ' +
+ 'Do not keep browsing after you already have the answer. Do not repeat an action that did not change the page. ' +
+ 'Do not end with “please wait” or a numbered list. The finish message is one short paragraph. ' +
  'Be direct. ' +
  toolNote +
  pageInfo
@@ -356,6 +371,7 @@ async function runTool(toolCall) {
  }
  const tool = TOOLS.find((t) => t.name === toolCall.function.name);
  if (!tool) return { text: `Unknown tool: ${toolCall.function.name}` };
+ if (!tool.command) return { text: typeof args.message === 'string' ? args.message : 'Stopped.' };
  addToolLine(tool.name, args);
  try {
  const data = await browserCommand(tool.command, args);
@@ -578,20 +594,15 @@ function parseJsonCalls(text, push) {
 const LOOP_EXEMPT_TOOLS = new Set(['scroll', 'press_key', 'page_snapshot', 'read_page', 'screenshot']);
 const OBSERVE_TOOLS = new Set(['page_snapshot', 'read_page', 'wait', 'screenshot']);
 
-// 0 (or blank) in settings = unlimited tool steps. This high ceiling is only a
-// runaway backstop so a broken model can't hang the panel forever; the
-// loop-detector below is the real guard against spinning.
-const UNLIMITED_STEP_BACKSTOP = 1000;
+// 0 (or blank) in settings = unlimited tool steps. This ceiling stops a runaway
+// model from burning tokens; unchanged-page and finish handling stop sooner.
+const UNLIMITED_STEP_BACKSTOP = 40;
 
 function isStallText(text) {
  const t = String(text || '').replace(/\s+/g, '');
  if (!t) return true;
  if (t.length > 80) return false;
  return /稍[候等]|请稍|正在为您|请等待|pleasewait|thinking/i.test(t);
-}
-
-function isHardBlock(text) {
- return /无法继续|找不到.*(按钮|控件|元素|入口)|页面出错|被拦截|验证码|登录墙/i.test(text || '');
 }
 
 function normalizeLabel(s) {
@@ -642,15 +653,41 @@ function parseToolArgs(tc) {
  }
 }
 
-function isPrematureStop(text) {
- const t = tidyAssistantText(text);
- if (!t || isStallText(t)) return true;
- if (isHardBlock(t)) return false;
- if (/需要确认|请问|能否告诉|你想|您想|几个事项|请告诉我|还是\s*[？?]/i.test(t)) return true;
- return false;
+let turnAbort = null;
+
+async function forceConclusion(signal, system, note) {
+ messages.push({ role: 'user', content: note });
+ throwIfAborted(signal);
+ const sent = [system, ...pruneForContext(messages, contextBudgetChars())];
+ const model = pickModel(sent);
+ setThinking(true);
+ let msg;
+ try {
+ msg = await callLLM({ model, messages: sent }, signal);
+ } finally {
+ setThinking(false);
+ }
+ const { content, reasoning } = extractContent(msg);
+ const text = tidyAssistantText(content || reasoning || '');
+ messages.push({ role: 'assistant', content: text });
+ if (text) addBubble('assistant', text);
+ else addBubble('assistant', '已停止：没有新进展，避免继续消耗。');
 }
 
-let turnAbort = null;
+function stopForFinish(toolCalls) {
+ let summary = '';
+ for (const tc of toolCalls) {
+ if (tc.function.name !== 'finish') {
+ messages.push({ role: 'tool', tool_call_id: tc.id, content: 'Skipped: the task is stopping.' });
+ continue;
+ }
+ const args = parseToolArgs(tc);
+ summary = tidyAssistantText(args.message || args.summary || '') || summary;
+ addToolLine('finish', { status: args.status || 'done' });
+ messages.push({ role: 'tool', tool_call_id: tc.id, content: 'Stopped.' });
+ }
+ addBubble('assistant', summary || '任务已结束。');
+}
 
 async function chatTurn(signal) {
  const system = { role: 'system', content: await buildSystemPrompt() };
@@ -666,8 +703,10 @@ async function chatTurn(signal) {
  }
 
  let lastModel = null;
- let nudges = 0;
+ let stallNudges = 0;
  let observeStreak = 0;
+ let unchangedSnapshots = 0;
+ let repeatStrikes = 0;
  let lastSnapshot = '';
  let lastStateKey = '';
  let lastClickLabel = '';
@@ -721,6 +760,10 @@ async function chatTurn(signal) {
  messages.push({ ...msg, content, tool_calls: toolCalls, reasoning_content: undefined, reasoning: undefined });
 
  if (toolCalls?.length) {
+ if (toolCalls.some((tc) => tc.function.name === 'finish')) {
+ stopForFinish(toolCalls);
+ return;
+ }
  if (toolCalls.some((tc) => tc.function.name === 'page_snapshot')) {
  toolCalls = toolCalls.filter((tc) => tc.function.name !== 'wait');
  }
@@ -742,10 +785,11 @@ async function chatTurn(signal) {
  const count = LOOP_EXEMPT_TOOLS.has(tc.function.name) ? 0 : (callCounts.get(sig) || 0) + 1;
  callCounts.set(sig, count);
  if (count > 2) {
+ repeatStrikes += 1;
  messages.push({
  role: 'tool',
  tool_call_id: tc.id,
- content: 'You already called this tool with these exact arguments — the result is above.',
+ content: 'You already called this tool with these exact arguments — the result is above. Call finish.',
  });
  continue;
  }
@@ -754,10 +798,11 @@ async function chatTurn(signal) {
  const args = parseToolArgs(tc);
  const label = args.ref ? parseSnapshotLabels(lastSnapshot).get(args.ref) : '';
  if (label && pageUnchangedSinceClick && lastClickLabel && label === lastClickLabel) {
+ repeatStrikes += 1;
  messages.push({
  role: 'tool',
  tool_call_id: tc.id,
- content: `Skipped: page did not change after clicking "${label}". Do not click another "${label}". Use a different control from the latest snapshot, or stop if nothing new appeared.`,
+ content: `Skipped: page did not change after clicking "${label}". Call finish with what you have, or say why you are blocked. Do not click another "${label}".`,
  });
  continue;
  }
@@ -782,15 +827,18 @@ async function chatTurn(signal) {
  const key = snapshotStateKey(result.text);
  if (lastStateKey && key === lastStateKey) {
  pageUnchangedSinceClick = true;
+ unchangedSnapshots += 1;
  } else {
  pageUnchangedSinceClick = false;
  lastClickLabel = '';
+ unchangedSnapshots = 0;
+ stallNudges = 0;
  }
  lastStateKey = key;
  lastSnapshot = result.text;
  toolText += repeatedLabelNote(result.text);
  if (pageUnchangedSinceClick && lastClickLabel) {
- toolText += `\n\n(system: page is unchanged after clicking "${lastClickLabel}". Do not click another control with that label.)`;
+ toolText += `\n\n(system: page is unchanged after clicking "${lastClickLabel}". Call finish if you already have the result or cannot continue. Do not click another control with that label.)`;
  }
  }
  messages.push({ role: 'tool', tool_call_id: tc.id, content: toolText.slice(0, MAX_TOOL_RESULT_CHARS) });
@@ -824,27 +872,44 @@ async function chatTurn(signal) {
  /* tab gone or restricted — skip flush this round */
  }
  }
- if (observeStreak >= 2 && nudges < 8) {
- nudges += 1;
+ const spinning = unchangedSnapshots >= 1 || observeStreak >= 2 || repeatStrikes >= 1;
+ if (spinning) {
+ if (stallNudges < 1) {
+ stallNudges += 1;
  messages.push({
  role: 'user',
  content:
- '(system: you already have a snapshot. Call click or type_text next. Do not wait or snapshot again unless you just acted and the page changed.)',
+ '(system: stop browsing. If you already have the data, call finish now and include it. If you cannot continue, call finish with status "blocked" and say why. Do not snapshot, wait, or repeat the same action.)',
  });
+ } else {
+ await forceConclusion(
+ signal,
+ system,
+ '(system: stop now. Do not call tools. In one short paragraph, give the user the result you already have, or say exactly why you cannot continue.)',
+ );
+ return;
+ }
  }
  continue;
  }
  const truncated = msg.__finishReason === 'length';
  const spoken = content || ((reasoning && !truncated) ? reasoning : '');
- if (settings.toolsEnabled && !toolCalls?.length && !isHardBlock(spoken) && isPrematureStop(spoken) && nudges < 8) {
- nudges += 1;
- if (content) addBubble('assistant', content);
+ if (settings.toolsEnabled && isStallText(spoken)) {
+ if (stallNudges < 1) {
+ stallNudges += 1;
  messages.push({
  role: 'user',
  content:
- '(system: this is a task agent, not Q&A. Do not ask the user. Use the goal and whatever is already on the page. Continue with tools until the goal is done or you are blocked.)',
+ '(system: do not say you are waiting. Call finish with the result you already have, or with status "blocked" and why you stopped.)',
  });
  continue;
+ }
+ await forceConclusion(
+ signal,
+ system,
+ '(system: stop now. Do not call tools. In one short paragraph, give the user the result you already have, or say exactly why you cannot continue.)',
+ );
+ return;
  }
  if (content) {
  addBubble('assistant', content);
@@ -857,20 +922,42 @@ async function chatTurn(signal) {
  }
  return;
  }
- if (content) addBubble('assistant', content);
+ await forceConclusion(
+ signal,
+ system,
+ '(system: step limit reached. Stop. Tell the user what you already found, or why the task is not finished. Do not call tools.)',
+ );
+}
+
+function setStopIdle() {
+ stopBtn.classList.remove('loading');
+ stopBtn.disabled = false;
+ stopBtn.textContent = '终止';
+ stopBtn.removeAttribute('aria-busy');
 }
 
 function setSendIdle() {
  sendBtn.classList.remove('hidden');
  stopBtn.classList.add('hidden');
+ setStopIdle();
 }
 
 function setSendBusy() {
  sendBtn.classList.add('hidden');
  stopBtn.classList.remove('hidden');
+ setStopIdle();
+}
+
+function setStopLoading() {
+ stopBtn.classList.add('loading');
+ stopBtn.disabled = true;
+ stopBtn.textContent = '终止中';
+ stopBtn.setAttribute('aria-busy', 'true');
 }
 
 function stopTurn() {
+ if (!busy || stopBtn.classList.contains('loading')) return;
+ setStopLoading();
  turnAbort?.abort();
 }
 

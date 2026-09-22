@@ -194,4 +194,21 @@ textarea:focus { border-color: var(--accent); }
 .composer button:hover { border-color: var(--accent); }
 #send-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
 #stop-btn { background: #b42318; border-color: #b42318; color: #fff; }
+#stop-btn.loading {
+  cursor: progress;
+  opacity: 0.85;
+}
+#stop-btn.loading::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: stop-spin 0.7s linear infinite;
+}
+@keyframes stop-spin { to { transform: rotate(360deg); } }
 .hidden { display: none; }
