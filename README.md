@@ -1,6 +1,6 @@
 # 让 AI 控制你的浏览器做任何事情
 
-browser-use
+browser-use-agent
 
 这是一个装在你 Chrome 浏览器里的 AI 助手，复杂表单的查找和填写、抢票、比价、爬取页面、总结长文、秒杀下单等，说清目标即可，它会分析需求 拆分任务，真正解放你的工作任务，也可以配合你的agent使用。
 
@@ -54,7 +54,7 @@ npm install
 
 
 
-## 2. 启动本机桥（仅 MCP）
+## 2. 启动本机桥（仅 MCP，不用本地agent 可不配置）
 
 要让 Cursor、Claude Code、Gemini CLI 操作这个 Chrome 时，再在仓库根目录启动：
 
