@@ -99,7 +99,7 @@ const TOOLS = [
  {
  name: 'click',
  description:
- 'Click an element by ref (from page_snapshot) or x/y. Many identical labels are a list: click ONE to choose that row, then use NEW different controls on the next snapshot. Do not walk the list clicking the same label again.',
+ 'Click an element by ref (from page_snapshot) or x/y. Do not hesitate about whether to click. After the filters are applied, click the first result immediately and move on. Do not pick a result before those filters are set.',
  parameters: {
  type: 'object',
  properties: {
@@ -174,12 +174,21 @@ const TOOLS = [
  {
  name: 'finish',
  description:
- 'Stop and reply to the user. Call this as soon as the goal is done (you already have the data or the outcome is on the page) or you cannot continue. Do not call any other tool after this.',
+ 'You decide when this task ends. Call finish and stop using tools when the goal is done, you cannot continue, or you must ask the user something before going on. Do not call any other tool after this. The user\'s next message starts a new task.',
  parameters: {
  type: 'object',
  properties: {
- status: { type: 'string', enum: ['done', 'blocked'], description: 'done = goal complete; blocked = cannot continue' },
- message: { type: 'string', description: 'What to tell the user: the result, or why you stopped' },
+ status: {
+ type: 'string',
+ enum: ['done', 'blocked', 'ask'],
+ description:
+ 'done = goal complete. blocked = cannot continue (not logged in, cannot pay, missing control, captcha, or the page will not move). ask = the page has no option to click and you need the user; do not use ask to choose among results after the filters are applied.',
+ },
+ message: {
+ type: 'string',
+ description:
+ 'What to tell the user, in their language: the result, why you stopped, or the one question they must answer.',
+ },
  },
  required: ['status', 'message'],
  },
@@ -271,7 +280,7 @@ function setThinking(on) {
  if (on) {
  const div = document.createElement('div');
  div.className = 'thinking';
- div.textContent = 'thinking';
+ div.textContent = '执行中';
  messagesEl.appendChild(div);
  messagesEl.scrollTop = messagesEl.scrollHeight;
  }
@@ -292,20 +301,21 @@ async function buildSystemPrompt() {
  const toolNote = settings.toolsEnabled
  ? 'You have tools: page_snapshot, read_page, click, type_text, press_key, scroll, navigate, wait, finish. ' +
  'Use page_snapshot to get refs (e1, e12…) before click/type. Click by ref, not x/y, unless the control is missing from the snapshot. ' +
- 'After any click, type, or navigation, take a fresh page_snapshot — old refs are stale. ' +
- 'Dropdowns: click to open, new snapshot, click the option. Forms: fill each field, pick matching options, then apply/submit. ' +
- 'Prefer page_snapshot over screenshot. After you have a snapshot, click or type — do not wait and snapshot again. Do not repeat the same click/type if the page did not change. ' +
- 'A search or list often shows many buttons with the same label. Click one. That is a choice, not a loop. Next snapshot: if the page did not change, do not click the next same-label button — look for a different control (confirm, next, cabin, login) or stop if nothing new appeared. ' +
+ 'Dropdowns: click to open, then click the option that matches the filter the user asked for. Forms: fill every filter field the user specified, then apply/submit. ' +
+ 'Prefer page_snapshot over screenshot. Click, type, key, and scroll results already include a fresh snapshot — use those refs on the next step. Do not call page_snapshot again unless that snapshot says the page is still loading or has no elements. ' +
+ 'Do not hesitate and do not weigh click versus skip. Until you call finish, respond with a tool call immediately. ' +
+ 'After the filters are filled and applied, click the first result at once, then continue. Do not compare, do not ask, and do not stop to decide. Do not click a result before the filters are done. If the snapshot says more controls were omitted, the first listed result is enough — click it and move on. Finish and reply as soon as the goal is done. ' +
  'Work on the page the user already has when it can finish the goal. If you decide to go to another site, call navigate — that opens a new tab and leaves the user\'s original tab alone. Do not close tabs. Clicks that the page itself follows stay in the same tab.'
  : 'Tool use is disabled; page text is included with the user message when available.';
  return (
  'You are an autonomous browser task agent (like a work buddy), not a Q&A chatbot. ' +
- 'The user publishes one goal in the side panel. You break it into steps, look at the page, plan, and operate until the goal is done or you are truly blocked. ' +
- 'Done = the requested outcome is on the page, or the data the user asked for is already in a tool result. ' +
- 'Blocked = the control is missing, the page errored, or a captcha/login wall stops you. ' +
- 'As soon as you are done or blocked, call finish with a short message for the user. Include the data when you have it. finish ends the task — do not snapshot, click, type, or wait again. ' +
- 'Do not keep browsing after you already have the answer. Do not repeat an action that did not change the page. ' +
- 'Do not end with “please wait” or a numbered list. The finish message is one short paragraph. ' +
+ 'Think quickly. Decide the next action in one short pass and send the tool call. Do not linger, compare options at length, or write out a long analysis. ' +
+ 'The user publishes one goal in the side panel. You break it into steps, look at the page, and operate. ' +
+ 'You decide whether to keep going or stop. The program will not stop you. When you stop, call finish — do not snapshot, click, type, or wait again. ' +
+ 'Call finish with status "done" when the goal is already complete: the outcome is on the page, or the data the user asked for is already in a tool result. Include that result in message. ' +
+ 'Call finish with status "blocked" when you judge that you cannot continue. That includes: the needed control is missing, the page errored, a captcha is in the way, the same action no longer changes the page, the user is not logged in (do not invent a password or keep clicking login), or payment cannot be completed (no saved method, or the user did not authorize this payment). Say what happened and what the user needs to do. ' +
+ 'Call finish with status "ask" only when you cannot go on without something the page does not offer, such as permission to pay or a required personal detail with no option to click. Put one question in message. Do not use ask to pick a result after the filters are applied — click the first result instead. This ends the current task. Their next message is a new task. ' +
+ 'Do not keep browsing after you already have the answer. Do not end with “please wait” or a numbered list. The finish message is one short paragraph in the user\'s language. ' +
  'Be direct. ' +
  toolNote +
  pageInfo
@@ -350,7 +360,7 @@ async function callLLM(body, signal) {
  `Common causes: vision enabled while running a text-only model (a screenshot in context will crash the engine), ` +
  `a tool-call parser that doesn't match the model, or out-of-memory. Server said: ${t.slice(0, 200)}`
  );
- continue; // retry once
+ continue;
  }
  if (!res.ok) {
  const text = await res.text().catch(() => '');
@@ -360,13 +370,15 @@ async function callLLM(body, signal) {
  const choice = data.choices?.[0];
  const msg = choice?.message;
  if (!msg) throw new Error('LLM returned no message');
- // finish_reason "length" means the server actually truncated; "stop" (or a
- // tool-call reason) means the model finished on its own.
  msg.__finishReason = choice.finish_reason || 'stop';
  return msg;
  }
  throw lastErr;
 }
+
+// These already change the page. Attach a snapshot so the next model step can act
+// instead of spending a round trip only looking.
+const REFRESH_AFTER = new Set(['click', 'type_text', 'press_key', 'scroll', 'navigate', 'tab_new', 'tab_select']);
 
 async function runTool(toolCall) {
  let args = {};
@@ -389,7 +401,21 @@ async function runTool(toolCall) {
  }
  if (tool.name === 'read_page') return { text: `Title: ${data.title}\nURL: ${data.url}\n\n${data.text}` };
  if (tool.name === 'page_snapshot') return { text: data.snapshot };
- return { text: JSON.stringify(data) };
+ let text = JSON.stringify(data);
+ if (REFRESH_AFTER.has(tool.name)) {
+ if (tool.name !== 'type_text' && tool.name !== 'scroll') {
+ await new Promise((r) => setTimeout(r, 200));
+ }
+ try {
+ const snap = await browserCommand('snapshot');
+ if (snap?.snapshot) {
+ text += '\n\nFresh snapshot (use these refs next; do not call page_snapshot unless this says the page is still loading or has no elements):\n' + snap.snapshot;
+ }
+ } catch (err) {
+ text += `\n\n(snapshot after action failed: ${err.message})`;
+ }
+ }
+ return { text };
  } catch (e) {
  return { text: `Error: ${e.message}` };
  }
@@ -472,6 +498,33 @@ function pruneForContext(msgs, maxChars) {
 
 function contextBudgetChars() {
  return (Number(settings.contextTokens) || 32768) * 3;
+}
+
+// Only the newest page dump has live refs. Older ones are stale and are what
+// make each later model call slow, so keep the action line and drop the page text.
+function isPageDump(message) {
+ return message?.role === 'tool' && typeof message.content === 'string' && (
+ message.content.includes('Fresh snapshot') ||
+ message.content.includes('Interactive elements') ||
+ message.content.startsWith('Title:')
+ );
+}
+
+function collapseStalePageDumps() {
+ let latest = -1;
+ for (let i = messages.length - 1; i >= 0; i--) {
+ if (isPageDump(messages[i])) {
+ latest = i;
+ break;
+ }
+ }
+ if (latest < 0) return;
+ for (let i = 0; i < latest; i++) {
+ const message = messages[i];
+ if (!isPageDump(message) || message.content.length < 500) continue;
+ const action = message.content.split('\n\nFresh snapshot')[0].slice(0, 200);
+ message.content = `${action}\n[stale page text removed — use the latest snapshot]`;
+ }
 }
 
 // Tool results from page_snapshot / read_page are stale the moment a newer
@@ -594,22 +647,7 @@ function parseJsonCalls(text, push) {
  }
 }
 
-// Repeating these with identical args is normal (scrolling through a long
-// page, pressing ArrowDown) — exempt from loop cutoff.
-// Same args every time is normal for these — do not treat as a stuck loop.
-const LOOP_EXEMPT_TOOLS = new Set(['scroll', 'press_key', 'page_snapshot', 'read_page', 'screenshot']);
 const OBSERVE_TOOLS = new Set(['page_snapshot', 'read_page', 'wait', 'screenshot']);
-
-// 0 (or blank) in settings = unlimited tool steps. This ceiling stops a runaway
-// model from burning tokens; unchanged-page and finish handling stop sooner.
-const UNLIMITED_STEP_BACKSTOP = 40;
-
-function isStallText(text) {
- const t = String(text || '').replace(/\s+/g, '');
- if (!t) return true;
- if (t.length > 80) return false;
- return /稍[候等]|请稍|正在为您|请等待|pleasewait|thinking/i.test(t);
-}
 
 function normalizeLabel(s) {
  return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -624,19 +662,6 @@ function parseSnapshotLabels(text) {
  return map;
 }
 
-function snapshotStateKey(text) {
- const url = (String(text).match(/^URL:\s*(.+)$/m) || [])[1] || '';
- const counts = new Map();
- for (const label of parseSnapshotLabels(text).values()) {
- counts.set(label, (counts.get(label) || 0) + 1);
- }
- const hist = [...counts.entries()]
- .sort((a, b) => a[0].localeCompare(b[0]))
- .map(([k, v]) => `${k}:${v}`)
- .join('|');
- return `${url}::${hist}`;
-}
-
 function repeatedLabelNote(text) {
  const counts = new Map();
  for (const label of parseSnapshotLabels(text).values()) {
@@ -647,7 +672,7 @@ function repeatedLabelNote(text) {
  return (
  '\n\n(note: ' +
  repeats.map(([l, n]) => `"${l}" ×${n}`).join('; ') +
- '. List items share a label. Click ONE. Then use new, different controls. Do not click the next same label.)'
+ '. Filters are done. Click the first of these now and move on. Do not hesitate about whether to click.)'
  );
 }
 
@@ -661,25 +686,6 @@ function parseToolArgs(tc) {
 
 let turnAbort = null;
 
-async function forceConclusion(signal, system, note) {
- messages.push({ role: 'user', content: note });
- throwIfAborted(signal);
- const sent = [system, ...pruneForContext(messages, contextBudgetChars())];
- const model = pickModel(sent);
- setThinking(true);
- let msg;
- try {
- msg = await callLLM({ model, messages: sent }, signal);
- } finally {
- setThinking(false);
- }
- const { content, reasoning } = extractContent(msg);
- const text = tidyAssistantText(content || reasoning || '');
- messages.push({ role: 'assistant', content: text });
- if (text) addBubble('assistant', text);
- else addBubble('assistant', '已停止：没有新进展，避免继续消耗。');
-}
-
 function stopForFinish(toolCalls) {
  let summary = '';
  for (const tc of toolCalls) {
@@ -692,15 +698,12 @@ function stopForFinish(toolCalls) {
  addToolLine('finish', { status: args.status || 'done' });
  messages.push({ role: 'tool', tool_call_id: tc.id, content: 'Stopped.' });
  }
- addBubble('assistant', summary || '任务已结束。');
+ const asking = toolCalls.some((tc) => tc.function.name === 'finish' && parseToolArgs(tc).status === 'ask');
+ addBubble('assistant', summary || (asking ? '需要你确认后才能继续。' : '任务已结束。'));
 }
 
 async function chatTurn(signal) {
  const system = { role: 'system', content: await buildSystemPrompt() };
- const callCounts = new Map(); // "tool:args" -> times called this turn
- const configured = Number(settings.maxToolSteps);
- const unlimited = !configured || configured <= 0;
- const maxSteps = unlimited ? UNLIMITED_STEP_BACKSTOP : configured;
  let turnUrl = null;
  try {
  turnUrl = (await browserCommand('get_url')).url;
@@ -709,16 +712,9 @@ async function chatTurn(signal) {
  }
 
  let lastModel = null;
- let stallNudges = 0;
- let observeStreak = 0;
- let unchangedSnapshots = 0;
- let repeatStrikes = 0;
- let lastSnapshot = '';
- let lastStateKey = '';
- let lastClickLabel = '';
- let pageUnchangedSinceClick = false;
- for (let i = 0; i < maxSteps; i++) {
+ for (;;) {
  throwIfAborted(signal);
+ collapseStalePageDumps();
  const sent = [system, ...pruneForContext(messages, contextBudgetChars())];
  const model = pickModel(sent);
  if (model !== lastModel) {
@@ -763,7 +759,13 @@ async function chatTurn(signal) {
 
  // Store only the clean answer: strict servers reject null content, and
  // resending blocks burns context for nothing.
- messages.push({ ...msg, content, tool_calls: toolCalls, reasoning_content: undefined, reasoning: undefined });
+ messages.push({
+ ...msg,
+ content: toolCalls?.length ? '' : content,
+ tool_calls: toolCalls,
+ reasoning_content: undefined,
+ reasoning: undefined,
+ });
 
  if (toolCalls?.length) {
  if (toolCalls.some((tc) => tc.function.name === 'finish')) {
@@ -783,70 +785,15 @@ async function chatTurn(signal) {
  }
  if (content) addBubble('assistant', content);
 
- const acted = toolCalls.some((tc) => !OBSERVE_TOOLS.has(tc.function.name));
- observeStreak = acted ? 0 : observeStreak + 1;
-
  for (const tc of toolCalls) {
- const sig = `${tc.function.name}:${tc.function.arguments || ''}`;
- const count = LOOP_EXEMPT_TOOLS.has(tc.function.name) ? 0 : (callCounts.get(sig) || 0) + 1;
- callCounts.set(sig, count);
- if (count > 2) {
- repeatStrikes += 1;
- messages.push({
- role: 'tool',
- tool_call_id: tc.id,
- content: 'You already called this tool with these exact arguments — the result is above. Call finish.',
- });
- continue;
- }
  throwIfAborted(signal);
- if (tc.function.name === 'click') {
- const args = parseToolArgs(tc);
- const label = args.ref ? parseSnapshotLabels(lastSnapshot).get(args.ref) : '';
- if (label && pageUnchangedSinceClick && lastClickLabel && label === lastClickLabel) {
- repeatStrikes += 1;
- messages.push({
- role: 'tool',
- tool_call_id: tc.id,
- content: `Skipped: page did not change after clicking "${label}". Call finish with what you have, or say why you are blocked. Do not click another "${label}".`,
- });
- continue;
- }
- }
  const result = await runTool(tc);
- if (tc.function.name === 'click') {
- let clicked = '';
- try {
- clicked = JSON.parse(result.text).clicked;
- } catch {
- /* not json */
- }
- lastClickLabel = normalizeLabel(clicked) || parseSnapshotLabels(lastSnapshot).get(parseToolArgs(tc).ref) || lastClickLabel;
- pageUnchangedSinceClick = true;
- }
  if (tc.function.name === 'page_snapshot' || tc.function.name === 'read_page') {
  supersedeOldSnapshots();
  staleSnapshotIds.add(tc.id);
  }
  let toolText = result.text;
- if (tc.function.name === 'page_snapshot') {
- const key = snapshotStateKey(result.text);
- if (lastStateKey && key === lastStateKey) {
- pageUnchangedSinceClick = true;
- unchangedSnapshots += 1;
- } else {
- pageUnchangedSinceClick = false;
- lastClickLabel = '';
- unchangedSnapshots = 0;
- stallNudges = 0;
- }
- lastStateKey = key;
- lastSnapshot = result.text;
- toolText += repeatedLabelNote(result.text);
- if (pageUnchangedSinceClick && lastClickLabel) {
- toolText += `\n\n(system: page is unchanged after clicking "${lastClickLabel}". Call finish if you already have the result or cannot continue. Do not click another control with that label.)`;
- }
- }
+ if (tc.function.name === 'page_snapshot') toolText += repeatedLabelNote(result.text);
  messages.push({ role: 'tool', tool_call_id: tc.id, content: toolText.slice(0, MAX_TOOL_RESULT_CHARS) });
  if (result.imageDataUrl) {
  // Only the newest screenshot stays in history — older ones are
@@ -878,45 +825,9 @@ async function chatTurn(signal) {
  /* tab gone or restricted — skip flush this round */
  }
  }
- const spinning = unchangedSnapshots >= 1 || observeStreak >= 2 || repeatStrikes >= 1;
- if (spinning) {
- if (stallNudges < 1) {
- stallNudges += 1;
- messages.push({
- role: 'user',
- content:
- '(system: stop browsing. If you already have the data, call finish now and include it. If you cannot continue, call finish with status "blocked" and say why. Do not snapshot, wait, or repeat the same action.)',
- });
- } else {
- await forceConclusion(
- signal,
- system,
- '(system: stop now. Do not call tools. In one short paragraph, give the user the result you already have, or say exactly why you cannot continue.)',
- );
- return;
- }
- }
  continue;
  }
  const truncated = msg.__finishReason === 'length';
- const spoken = content || ((reasoning && !truncated) ? reasoning : '');
- if (settings.toolsEnabled && isStallText(spoken)) {
- if (stallNudges < 1) {
- stallNudges += 1;
- messages.push({
- role: 'user',
- content:
- '(system: do not say you are waiting. Call finish with the result you already have, or with status "blocked" and why you stopped.)',
- });
- continue;
- }
- await forceConclusion(
- signal,
- system,
- '(system: stop now. Do not call tools. In one short paragraph, give the user the result you already have, or say exactly why you cannot continue.)',
- );
- return;
- }
  if (content) {
  addBubble('assistant', content);
  } else if (reasoning && !truncated) {
@@ -928,11 +839,6 @@ async function chatTurn(signal) {
  }
  return;
  }
- await forceConclusion(
- signal,
- system,
- '(system: step limit reached. Stop. Tell the user what you already found, or why the task is not finished. Do not call tools.)',
- );
 }
 
 function setStopIdle() {

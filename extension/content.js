@@ -178,6 +178,80 @@
     return parts.join(' ');
   }
 
+  function labelKey(el) {
+    return textLabel(el).replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function inSiteChrome(el) {
+    return !!el.closest('header, nav, footer, [role="navigation"], [role="banner"], [role="contentinfo"]');
+  }
+
+  function isFormControl(el) {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return true;
+    const role = el.getAttribute('role');
+    if (role === 'checkbox' || role === 'radio' || role === 'combobox' || role === 'switch' || role === 'textbox') return true;
+    return el.isContentEditable;
+  }
+
+  function isSearchSubmit(el) {
+    if (el.type === 'submit') return true;
+    const label = textLabel(el);
+    return label.length > 0 && label.length <= 6 && /搜索|查询|search|submit/i.test(label);
+  }
+
+  // Result grids (hotel lists, search results) repeat the same buttons hundreds
+  // of times. Keep the form plus the first few listings so the model can click
+  // immediately instead of reading every card.
+  function compactList(ordered) {
+    const counts = new Map();
+    for (const el of ordered) {
+      const key = labelKey(el);
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const forms = [];
+    const results = [];
+    const repeats = [];
+    const filters = [];
+    const blank = [];
+    const repeatSeen = new Set();
+    let omitted = 0;
+    for (const el of ordered) {
+      const label = textLabel(el).replace(/\s+/g, ' ').trim();
+      const key = label.toLowerCase();
+      if (!isFormControl(el) && !isSearchSubmit(el) && inSiteChrome(el)) {
+        omitted++;
+        continue;
+      }
+      if (isFormControl(el) || isSearchSubmit(el)) {
+        forms.push(el);
+        continue;
+      }
+      if (!label) {
+        if (blank.length < 6) blank.push(el);
+        else omitted++;
+        continue;
+      }
+      if ((counts.get(key) || 0) >= 3) {
+        if (repeatSeen.has(key)) omitted++;
+        else {
+          repeatSeen.add(key);
+          repeats.push(el);
+        }
+        continue;
+      }
+      if (label.length > 18) {
+        if (results.length < 20) results.push(el);
+        else omitted++;
+        continue;
+      }
+      if (filters.length < 24) filters.push(el);
+      else omitted++;
+    }
+    return { kept: [...forms, ...results, ...repeats, ...filters, ...blank], omitted };
+  }
+
   function buildSnapshot(refPrefix = '') {
     refMap = new Map();
     refCounter = 0;
@@ -193,7 +267,7 @@
         if (!isVisible(h)) continue;
         const text = h.innerText.replace(/\s+/g, ' ').trim().slice(0, 100);
         if (text) lines.push(`  ${'#'.repeat(Number(h.tagName[1]))} ${text}`);
-        if (++count >= 30) break;
+        if (++count >= 12) break;
       }
       lines.push('');
     }
@@ -206,17 +280,27 @@
       seen.add(el);
       ordered.push(el);
     }
-    // Fallback pass for framework widgets with no semantic markup.
-    collectPointerClickables(seen, ordered);
-
-    const submits = ordered.filter(isSubmitControl);
-    const rest = ordered.filter((el) => !isSubmitControl(el));
-    const ranked = [...submits, ...rest];
+    // List pages already have hundreds of real links. Skip the full-DOM pointer
+    // walk there — it is slow and mostly duplicates those cards.
+    const listPage = ordered.length >= 80;
+    if (!listPage) collectPointerClickables(seen, ordered);
 
     let truncated = false;
+    let ranked;
+    let omitted = 0;
+    if (listPage) {
+      const compact = compactList(ordered);
+      ranked = compact.kept;
+      omitted = compact.omitted;
+    } else {
+      const submits = ordered.filter(isSubmitControl);
+      const rest = ordered.filter((el) => !isSubmitControl(el));
+      ranked = [...submits, ...rest];
+    }
+
     for (const el of ranked) {
       // Never drop real submit buttons even if the page has hundreds of nav links.
-      if (refCounter >= 500 && !isSubmitControl(el)) {
+      if (!listPage && refCounter >= 500 && !isSubmitControl(el)) {
         truncated = true;
         continue;
       }
@@ -224,7 +308,13 @@
       refMap.set(ref, el);
       lines.push(describe(el, ref));
     }
-    if (truncated) lines.push('... (truncated at 500 elements)');
+    if (listPage && omitted > 0) {
+      lines.push(
+        `... (${omitted} more controls omitted). This is a result list. Click the first result link above now. Do not compare, do not scroll, and do not snapshot again to see more.`
+      );
+    } else if (truncated) {
+      lines.push('... (truncated at 500 elements)');
+    }
     return lines.join('\n');
   }
 
