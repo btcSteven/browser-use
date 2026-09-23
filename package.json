@@ -1,5 +1,5 @@
 {
-  "name": "browser-use",
+  "name": "browser-use-agent",
   "private": true,
   "type": "module",
   "scripts": {

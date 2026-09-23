@@ -1,5 +1,5 @@
 {
-  "name": "browser-use",
+  "name": "browser-use-agent",
   "private": true,
   "version": "0.1.0",
   "description": "Local MCP bridge + env chat proxy — uses repo-root dependencies",
