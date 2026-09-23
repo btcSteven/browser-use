@@ -28,7 +28,7 @@
       height: '22px',
       zIndex: '2147483647',
       pointerEvents: 'none',
-      transition: 'left 0.35s cubic-bezier(.3,.7,.4,1), top 0.35s cubic-bezier(.3,.7,.4,1)',
+      transition: 'left 0.08s linear, top 0.08s linear',
       opacity: '0',
     });
     cursorEl.innerHTML =
@@ -47,7 +47,7 @@
       void c.offsetWidth;
       c.style.left = `${x - 2}px`;
       c.style.top = `${y - 2}px`;
-      setTimeout(resolve, 380);
+      setTimeout(resolve, 80);
     });
   }
 
@@ -349,6 +349,37 @@
     };
   }
 
+  function pointOn(el) {
+    const rect = el.getBoundingClientRect();
+    const x = Math.round(Math.min(Math.max(rect.left + rect.width / 2, 1), window.innerWidth - 2));
+    const y = Math.round(Math.min(Math.max(rect.top + rect.height / 2, 1), window.innerHeight - 2));
+    return { x, y };
+  }
+
+  // Locate the target and show the cursor. The background sends the actual
+  // click as a trusted browser input so the page treats it as a real press.
+  async function clickPoint(args) {
+    let x;
+    let y;
+    let label;
+    if (args.ref) {
+      const el = getRefElement(args.ref);
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      await new Promise((r) => setTimeout(r, 40));
+      ({ x, y } = pointOn(el));
+      label = textLabel(el) || el.tagName.toLowerCase();
+    } else {
+      x = args.x;
+      y = args.y;
+      const target = document.elementFromPoint(x, y);
+      if (!target) throw new Error(`Nothing at coordinates (${x}, ${y})`);
+      label = textLabel(target) || target.tagName.toLowerCase();
+    }
+    await moveCursorTo(x, y);
+    pulseCursor();
+    return { clicked: label, x, y, ref: args.ref };
+  }
+
   async function clickAt(x, y, { button = 0 } = {}) {
     await moveCursorTo(x, y);
     const target = document.elementFromPoint(x, y);
@@ -367,10 +398,8 @@
   async function clickRef(ref) {
     const el = getRefElement(ref);
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
-    await new Promise((r) => setTimeout(r, 100));
-    const rect = el.getBoundingClientRect();
-    const x = Math.round(rect.left + rect.width / 2);
-    const y = Math.round(rect.top + rect.height / 2);
+    await new Promise((r) => setTimeout(r, 40));
+    const { x, y } = pointOn(el);
     await moveCursorTo(x, y);
     pulseCursor();
     const init = mouseEventInit(x, y);
@@ -515,6 +544,9 @@
           return { snapshot: buildSnapshot(msg.args?.refPrefix || ''), count: refCounter };
         case 'read_page':
           return readPage();
+        case 'click_point':
+          if (msg.args?.ref || (msg.args?.x != null && msg.args?.y != null)) return clickPoint(msg.args);
+          throw new Error('click requires a ref or x/y coordinates');
         case 'click':
           if (msg.args.ref) return clickRef(msg.args.ref);
           if (msg.args.x != null && msg.args.y != null) return clickAt(msg.args.x, msg.args.y, msg.args);

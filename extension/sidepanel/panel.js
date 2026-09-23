@@ -403,7 +403,7 @@ async function runTool(toolCall) {
  if (tool.name === 'page_snapshot') return { text: data.snapshot };
  let text = JSON.stringify(data);
  if (REFRESH_AFTER.has(tool.name)) {
- if (tool.name !== 'type_text' && tool.name !== 'scroll') {
+ if (tool.name !== 'type_text' && tool.name !== 'scroll' && tool.name !== 'click') {
  await new Promise((r) => setTimeout(r, 200));
  }
  try {

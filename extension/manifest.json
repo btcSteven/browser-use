@@ -3,7 +3,7 @@
   "name": "browser-use",
   "version": "0.1.0",
   "description": "Local browser agent: MCP bridge plus side-panel chat using the .env chat model.",
-  "permissions": ["tabs", "activeTab", "scripting", "storage", "sidePanel", "alarms"],
+  "permissions": ["tabs", "activeTab", "scripting", "storage", "sidePanel", "alarms", "debugger"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

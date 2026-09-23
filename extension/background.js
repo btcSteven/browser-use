@@ -217,6 +217,84 @@ function waitForLoad(tabId, timeoutMs = 8000) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const MOUSE_BUTTONS = ['left', 'middle', 'right'];
+
+// Scripted element.click() is ignored by sites like Ctrip. Debugger input is a
+// real browser click (isTrusted), so the page's own handler runs.
+async function trustedClick(tabId, x, y, buttonIndex = 0) {
+  const target = { tabId };
+  const button = MOUSE_BUTTONS[buttonIndex] || 'left';
+  let attachedHere = false;
+  try {
+    await chrome.debugger.attach(target, '1.3');
+    attachedHere = true;
+  } catch (e) {
+    if (!/already attached/i.test(String(e?.message || e))) throw e;
+  }
+  try {
+    const press = { type: 'mousePressed', x, y, button, clickCount: 1 };
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', press);
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { ...press, type: 'mouseReleased' });
+  } finally {
+    if (attachedHere) {
+      try { await chrome.debugger.detach(target); } catch { /* already gone */ }
+    }
+  }
+}
+
+async function frameOffset(tabId, frameId) {
+  if (!frameId) return { x: 0, y: 0 };
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => {
+        const el = window.frameElement;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: r.left, y: r.top };
+      },
+    });
+    const hit = results.find((r) => r.frameId === frameId);
+    if (hit?.result) return hit.result;
+  } catch { /* cross-origin frame has no frameElement */ }
+  return { x: 0, y: 0 };
+}
+
+// After a real click, follow a same-tab navigation or a tab the click opened
+// so the next snapshot is the destination, not the list we just left.
+async function trustedClickAndSettle(tabId, x, y, buttonIndex = 0) {
+  const before = await chrome.tabs.get(tabId);
+  let spawned = null;
+  const onCreated = (tab) => {
+    if (tab.windowId === before.windowId) spawned = tab;
+  };
+  chrome.tabs.onCreated.addListener(onCreated);
+  try {
+    await trustedClick(tabId, x, y, buttonIndex);
+    await sleep(300);
+  } catch (e) {
+    chrome.tabs.onCreated.removeListener(onCreated);
+    throw e;
+  }
+  chrome.tabs.onCreated.removeListener(onCreated);
+  if (spawned?.id) {
+    workTabId = spawned.id;
+    await chrome.tabs.update(spawned.id, { active: true });
+    await waitForLoad(spawned.id, 4000);
+    const updated = await chrome.tabs.get(spawned.id);
+    return { opened: 'new_tab', url: updated.url, title: updated.title };
+  }
+  let mid;
+  try { mid = await chrome.tabs.get(tabId); } catch { return { opened: 'none' }; }
+  if (mid.status === 'loading' || mid.url !== before.url) {
+    await waitForLoad(tabId, 4000);
+    const updated = await chrome.tabs.get(tabId);
+    return { opened: updated.url !== before.url ? 'same_tab' : 'updated', url: updated.url, title: updated.title };
+  }
+  return { opened: 'none', url: mid.url, title: mid.title };
+}
+
 async function normalizeScreenshot(dataUrl, viewport, format) {
   if (!viewport?.width) return dataUrl;
   const blob = await (await fetch(dataUrl)).blob();
@@ -408,8 +486,24 @@ async function handleCommand(name, args) {
       return main;
     }
 
+    case 'click': {
+      const tab = await getActiveTab();
+      assertScriptable(tab);
+      const frameId = frameIdForRef(args?.ref);
+      const point = await sendToContent(tab.id, 'click_point', args, frameId);
+      const offset = await frameOffset(tab.id, frameId);
+      const x = point.x + offset.x;
+      const y = point.y + offset.y;
+      try {
+        const settled = await trustedClickAndSettle(tab.id, x, y, args?.button || 0);
+        return { ...point, x, y, trusted: true, ...settled };
+      } catch {
+        const data = await sendToContent(tab.id, 'click', args, frameId);
+        return { ...data, trusted: false, opened: 'none' };
+      }
+    }
+
     // Page actions: refs carry their frame (f123_e4); everything else hits the top frame.
-    case 'click':
     case 'hover':
     case 'type':
     case 'press_key':
