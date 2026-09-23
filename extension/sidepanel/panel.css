@@ -44,7 +44,7 @@ header {
   font-weight: 400;
   font-size: 11px;
   color: var(--text-dim);
-  max-width: 140px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
